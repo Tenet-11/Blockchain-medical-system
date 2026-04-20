@@ -1,0 +1,74 @@
+{
+	"compiler": {
+		"version": "0.7.6+commit.7338295f"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_from",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_value",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "_token",
+						"type": "address"
+					},
+					{
+						"internalType": "bytes",
+						"name": "_extraData",
+						"type": "bytes"
+					}
+				],
+				"name": "receiveApproval",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"blockchain_lab1.sol": "tokenRecipient"
+		},
+		"evmVersion": "istanbul",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"blockchain_lab1.sol": {
+			"keccak256": "0x807f1ebfd8add3abd3d37de5c274a354c63873f2060b51ae04bba17df2ecef93",
+			"license": "UNLICENSED",
+			"urls": [
+				"bzz-raw://38702a11075267534915df713a1c54ac587ca6d3835f2dd612d54b454aca1440",
+				"dweb:/ipfs/Qmb7VMzNDGbk2X1NugBTbh7NwWENJKddgpT6kuXMaWFmkb"
+			]
+		}
+	},
+	"version": 1
+}
