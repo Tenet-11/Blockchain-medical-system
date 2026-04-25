@@ -1,21 +1,147 @@
 from datetime import datetime
 import hashlib
 import json
+import sqlite3
 
+DB_NAME = "medical_records.db"
+
+def reset_database():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM medical_records")
+
+    conn.commit()
+    conn.close()
+
+    print("[DB] Database reset.")
+
+
+# 初始化資料庫
+def init_db():
+    # 連接資料庫（沒有就建立）
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # 建立 medical_records 資料表
+    # IF NOT EXISTS = 如果已存在就不會重建
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS medical_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        record_id TEXT NOT NULL UNIQUE,
+        patient_id TEXT NOT NULL,
+        doctor_name TEXT NOT NULL,
+        diagnosis TEXT NOT NULL,
+        prescription TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        record_hash TEXT NOT NULL
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# 2️⃣ 插入資料
+def insert_record(record):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+        INSERT INTO medical_records
+        (record_id, patient_id, doctor_name, diagnosis, prescription, timestamp, record_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            record.record_id,
+            record.patient_id,
+            record.doctor_name,
+            record.diagnosis,
+            record.prescription,
+            record.timestamp,
+            record.calculate_hash()
+        ))
+
+        conn.commit()
+        print(f"[DB] Record {record.record_id} inserted.")
+
+    except sqlite3.IntegrityError:
+        print(f"[DB] Record {record.record_id} already exists.")
+
+    conn.close()
+
+
+# 3️⃣ 查全部資料
+def get_all_records():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT record_id, patient_id, doctor_name, diagnosis, prescription, timestamp, record_hash
+    FROM medical_records
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return rows
+
+
+# 4️⃣ 查單筆資料
+def get_record_by_id(record_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT record_id, patient_id, doctor_name, diagnosis, prescription, timestamp, record_hash
+    FROM medical_records
+    WHERE record_id = ?
+    """, (record_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return row
+
+
+# 5️⃣ 顯示資料庫內容（方便你截圖）
+def display_database():
+    records = get_all_records()
+
+    print("\n" + "=" * 80)
+    print("           SQLite Medical Records (Off-chain Storage)")
+    print("=" * 80)
+
+    if not records:
+        print("No records found.")
+        return
+
+    for r in records:
+        print(f"Record ID      : {r[0]}")
+        print(f"Patient ID     : {r[1]}")
+        print(f"Doctor Name    : {r[2]}")
+        print(f"Diagnosis      : {r[3]}")
+        print(f"Prescription   : {r[4]}")
+        print(f"Timestamp      : {r[5]}")
+        print(f"Record Hash    : {r[6]}")
+        print("-" * 80)
 
 # =========================
 # Medical Record Class
 # =========================
 class MedicalRecord:
-    def __init__(self, record_id, patient_id, doctor_name, diagnosis, prescription):
+    def __init__(self, record_id, patient_id, doctor_name, diagnosis, prescription, timestamp=None):
         self.record_id = record_id
         self.patient_id = patient_id
         self.doctor_name = doctor_name
         self.diagnosis = diagnosis
         self.prescription = prescription
-
-        current_time = datetime.now()
-        self.timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        if timestamp:
+            self.timestamp = timestamp
+        else:
+            self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def to_dict(self):
         return {
@@ -88,6 +214,14 @@ class Blockchain:
             previous_hash=latest_block.hash
         )
         self.chain.append(new_block)
+    
+
+    def find_block_by_record_id(self, record_id):
+        for block in self.chain:
+            if isinstance(block.medical_record, MedicalRecord):
+                if block.medical_record.record_id == record_id:
+                    return block
+        return None
 
     # 驗證整條鏈是否有效
     def is_chain_valid(self):
@@ -169,38 +303,91 @@ class Blockchain:
             return False
 
 
+def verify_record_from_db(record_id, blockchain=None):
+    row = get_record_by_id(record_id)
+
+    if not row:
+        print("Record not found in database.")
+        return False
+
+    # 從 SQLite 資料重建 MedicalRecord
+    db_record = MedicalRecord(
+        record_id=row[0],
+        patient_id=row[1],
+        doctor_name=row[2],
+        diagnosis=row[3],
+        prescription=row[4],
+        timestamp=row[5]
+    )
+
+    # 重新計算目前資料的 hash
+    recalculated_hash = db_record.calculate_hash()
+
+    # SQLite 中原本儲存的 hash
+    stored_hash = row[6]
+
+    print("\n" + "=" * 90)
+    print("                 Database Integrity Verification")
+    print("=" * 90)
+    print(f"Record ID          : {record_id}")
+    print(f"Stored DB Hash     : {stored_hash}")
+    print(f"Recalculated Hash  : {recalculated_hash}")
+
+    if recalculated_hash == stored_hash:
+        print("Result             : VALID")
+        print("=" * 90)
+        return True
+    else:
+        print("Result             : INVALID (Data Tampered)")
+        print("=" * 90)
+        return False
+    
+
+def tamper_database_record(record_id, new_diagnosis):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    UPDATE medical_records
+    SET diagnosis = ?
+    WHERE record_id = ?
+    """, (new_diagnosis, record_id))
+
+    conn.commit()
+    conn.close()
+
+    print(f"[DB] Record {record_id} diagnosis changed to {new_diagnosis}.")
+
+
 # =========================
-# Main Program
+# Main Program (Demo for Step 4)
 # =========================
-record1 = MedicalRecord("R001", "P001", "Dr. Wang", "Flu", "Medicine A")
-record2 = MedicalRecord("R002", "P002", "Dr. Lin", "Cold", "Medicine B")
-record3 = MedicalRecord("R003", "P003", "Dr. Chen", "Fever", "Medicine C")
 
-blockchain = Blockchain()
-blockchain.add_block(record1)
-blockchain.add_block(record2)
-blockchain.add_block(record3)
+if __name__ == "__main__":
+    init_db()
 
-# 1. 顯示原始區塊鏈
-print("\n=== Original Blockchain ===")
-blockchain.display_chain()
+    record1 = MedicalRecord("R001", "P001", "Dr. Wang", "Flu", "Medicine A")
+    record2 = MedicalRecord("R002", "P002", "Dr. Lin", "Cold", "Medicine B")
+    record3 = MedicalRecord("R003", "P003", "Dr. Chen", "Fever", "Medicine C")
 
-# 2. 驗證整條鏈
-print("\n=== Full Blockchain Validation ===")
-print("Is blockchain valid?", blockchain.is_chain_valid())
+    blockchain = Blockchain()
+    blockchain.add_block(record1)
+    blockchain.add_block(record2)
+    blockchain.add_block(record3)
 
-# 3. 驗證單筆資料（Block 2）
-print("\n=== Verify Single Record Before Tampering ===")
-blockchain.verify_block(2)
+    print("\n=== Inserting Records into SQLite ===")
+    insert_record(record1)
+    insert_record(record2)
+    insert_record(record3)
 
-# 4. 模擬竄改資料
-print("\n=== Tampering with Block 2 ===")
-blockchain.chain[2].medical_record.diagnosis = "Cancer"
+    print("\n=== Display All Records (SQLite) ===")
+    display_database()
 
-# 5. 再次驗證單筆資料
-print("\n=== Verify Single Record After Tampering ===")
-blockchain.verify_block(2)
+    print("\n=== Verify Record R002 Before Tampering ===")
+    verify_record_from_db("R002", blockchain)
 
-# 6. 再驗證整條鏈
-print("\n=== Full Blockchain Validation After Tampering ===")
-print("Is blockchain valid after tampering?", blockchain.is_chain_valid())
+    print("\n=== Tampering Database Record R002 ===")
+    tamper_database_record("R002", "Cancer")
+
+    print("\n=== Verify Record R002 After Tampering ===")
+    verify_record_from_db("R002", blockchain)
