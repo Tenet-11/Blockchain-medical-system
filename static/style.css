@@ -1,0 +1,181 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, "Microsoft JhengHei", sans-serif;
+    background: #f5f1ec;
+    color: #222;
+}
+
+.page {
+    width: min(1120px, 92vw);
+    margin: 0 auto;
+    padding: 40px 0 56px;
+}
+
+.hero {
+    padding: 36px;
+    border-radius: 28px;
+    background: #ffffff;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.08);
+    margin-bottom: 24px;
+}
+
+.eyebrow {
+    color: #86565a;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+}
+
+h1 {
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 1;
+    margin: 0;
+}
+
+.subtitle {
+    margin: 18px 0 0;
+    color: #666;
+    font-size: 18px;
+}
+
+.toolbar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.08);
+}
+
+.wide {
+    grid-column: span 2;
+}
+
+.result-card {
+    grid-column: span 2;
+}
+
+h2 {
+    margin: 0 0 8px;
+    color: #6f474b;
+    font-size: 24px;
+}
+
+.hint {
+    margin-top: 0;
+    color: #666;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+input {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 14px;
+    padding: 13px 14px;
+    font-size: 16px;
+    outline: none;
+}
+
+input:focus {
+    border-color: #86565a;
+    box-shadow: 0 0 0 4px rgba(134, 86, 90, 0.15);
+}
+
+button {
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    background: #222;
+    color: #fff;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+    opacity: 0.9;
+}
+
+button.secondary {
+    background: #86565a;
+}
+
+button.danger {
+    background: #b33434;
+}
+
+.danger-card {
+    border: 2px solid rgba(179, 52, 52, 0.12);
+}
+
+.status {
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-weight: 900;
+    margin-bottom: 14px;
+}
+
+.status.neutral {
+    background: #eee;
+    color: #333;
+}
+
+.status.valid {
+    background: #dff5e5;
+    color: #167537;
+}
+
+.status.invalid {
+    background: #ffe0e0;
+    color: #a11212;
+}
+
+pre {
+    margin: 0;
+    min-height: 220px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #161616;
+    color: #f7f7f7;
+    border-radius: 18px;
+    padding: 18px;
+    line-height: 1.5;
+    overflow: auto;
+}
+
+@media (max-width: 760px) {
+    .grid,
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .wide,
+    .result-card {
+        grid-column: span 1;
+    }
+}

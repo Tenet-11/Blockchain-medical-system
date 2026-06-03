@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Medical Record Integrity System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <style>
+        :root {
+            --bg: #eef4ff;
+            --card: rgba(255, 255, 255, 0.92);
+            --text: #172033;
+            --muted: #697386;
+            --primary: #3267e3;
+            --primary-dark: #204ab4;
+            --soft-primary: #e8efff;
+            --danger: #d83a52;
+            --danger-soft: #ffe8ed;
+            --success: #14805e;
+            --success-soft: #e4f8f0;
+            --border: #dbe4f5;
+            --shadow: 0 18px 45px rgba(39, 74, 132, 0.14);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Arial, "Noto Sans TC", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, #dce9ff 0, transparent 32%),
+                linear-gradient(135deg, #f7fbff 0%, var(--bg) 100%);
+            min-height: 100vh;
+        }
+
+        .page {
+            width: min(1180px, calc(100% - 36px));
+            margin: 0 auto;
+            padding: 36px 0 48px;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .eyebrow {
+            display: inline-block;
+            margin: 0 0 10px;
+            padding: 7px 14px;
+            border-radius: 999px;
+            background: var(--soft-primary);
+            color: var(--primary-dark);
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(32px, 5vw, 54px);
+            letter-spacing: -0.04em;
+        }
+
+        .subtitle {
+            margin: 12px auto 0;
+            color: var(--muted);
+            font-size: 17px;
+        }
+
+        .role-panel {
+            display: grid;
+            grid-template-columns: minmax(260px, 1.1fr) minmax(220px, 0.9fr) auto;
+            gap: 16px;
+            align-items: end;
+            margin: 26px 0 20px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.8);
+            border-radius: 26px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(232,239,255,0.9));
+            box-shadow: var(--shadow);
+        }
+
+        .role-field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .role-field span {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .select-wrap, .patient-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid var(--border);
+        }
+
+        .role-icon {
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border-radius: 13px;
+            background: var(--soft-primary);
+            font-size: 19px;
+        }
+
+        select, input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            padding: 11px 12px;
+            font-size: 15px;
+            outline: none;
+            background: #fff;
+        }
+
+        .select-wrap select, .patient-wrap input {
+            border: 0;
+            padding: 0;
+            border-radius: 0;
+            font-weight: 700;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(50, 103, 227, 0.12);
+        }
+
+        .role-badge {
+            min-width: 190px;
+            padding: 14px 18px;
+            border-radius: 18px;
+            background: var(--text);
+            color: white;
+        }
+
+        .role-badge strong {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .role-badge small {
+            color: rgba(255,255,255,0.75);
+            line-height: 1.4;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 0 0 22px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.82);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: 0 10px 28px rgba(39, 74, 132, 0.08);
+        }
+
+        .wide { grid-column: span 2; }
+        .result-card { grid-column: span 3; }
+
+        h2 {
+            margin: 0 0 8px;
+            font-size: 21px;
+        }
+
+        .hint {
+            margin: 0 0 16px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        button {
+            border: 0;
+            border-radius: 14px;
+            padding: 11px 16px;
+            font-weight: 800;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            box-shadow: 0 8px 18px rgba(50, 103, 227, 0.22);
+        }
+
+        button:hover { transform: translateY(-1px); }
+
+        button.secondary {
+            color: var(--primary-dark);
+            background: var(--soft-primary);
+            box-shadow: none;
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #e95268, var(--danger));
+            box-shadow: 0 8px 18px rgba(216, 58, 82, 0.2);
+        }
+
+        .danger-card {
+            border-color: rgba(216,58,82,0.18);
+            background: linear-gradient(180deg, #fff, var(--danger-soft));
+        }
+
+        .history-card {
+            border-color: rgba(50,103,227,0.18);
+            background: linear-gradient(180deg, #fff, var(--soft-primary));
+        }
+
+        .status {
+            display: inline-block;
+            padding: 9px 13px;
+            border-radius: 999px;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        .neutral { background: var(--soft-primary); color: var(--primary-dark); }
+        .valid { background: var(--success-soft); color: var(--success); }
+        .invalid { background: var(--danger-soft); color: var(--danger); }
+
+        pre {
+            margin: 0;
+            padding: 18px;
+            border-radius: 18px;
+            background: #111827;
+            color: #e5e7eb;
+            overflow: auto;
+            min-height: 170px;
+            line-height: 1.5;
+        }
+
+
+        .visual-output {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .history-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 12px 0 20px;
+        }
+
+        .summary-box {
+            padding: 15px 16px;
+            border-radius: 18px;
+            background: #ffffff;
+            border: 1px solid var(--border);
+        }
+
+        .summary-box span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
+
+        .summary-box strong {
+            font-size: 20px;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 34px;
+            margin-top: 12px;
+        }
+
+        .timeline::before {
+            content: "";
+            position: absolute;
+            left: 13px;
+            top: 8px;
+            bottom: 8px;
+            width: 3px;
+            border-radius: 99px;
+            background: linear-gradient(180deg, var(--primary), rgba(50,103,227,0.14));
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -34px;
+            top: 18px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            font-size: 12px;
+            font-weight: 900;
+            box-shadow: 0 8px 20px rgba(50, 103, 227, 0.25);
+        }
+
+        .medical-card {
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 18px;
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            box-shadow: 0 10px 24px rgba(39, 74, 132, 0.08);
+        }
+
+        .medical-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .medical-card-head h3 {
+            margin: 0 0 5px;
+            font-size: 19px;
+        }
+
+        .medical-card-head p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: var(--soft-primary);
+            color: var(--primary-dark);
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .medical-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 14px 0;
+        }
+
+        .info-line {
+            padding: 12px;
+            border-radius: 15px;
+            background: #f7f9fe;
+            border: 1px solid #eef2fb;
+        }
+
+        .info-line span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+        .info-line strong {
+            font-size: 15px;
+        }
+
+        .chain-box {
+            margin-top: 12px;
+            padding: 14px;
+            border-radius: 17px;
+            background: #111827;
+            color: #e5e7eb;
+        }
+
+        .chain-title {
+            margin: 0 0 9px;
+            font-weight: 900;
+            color: #ffffff;
+        }
+
+        .hash-row {
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: 10px;
+            padding: 7px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 13px;
+        }
+
+        .hash-row span:first-child {
+            color: rgba(255,255,255,0.62);
+        }
+
+        .hash-row span:last-child {
+            overflow-wrap: anywhere;
+        }
+
+        .raw-json-toggle {
+            margin-top: 16px;
+            border-radius: 18px;
+            background: #f7f9fe;
+            border: 1px solid var(--border);
+            padding: 12px 14px;
+        }
+
+        .raw-json-toggle summary {
+            cursor: pointer;
+            font-weight: 900;
+            color: var(--primary-dark);
+        }
+
+        .raw-json-toggle pre {
+            margin-top: 12px;
+            min-height: 0;
+        }
+
+        .empty-state {
+            padding: 22px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px dashed var(--border);
+            color: var(--muted);
+            text-align: center;
+            font-weight: 800;
+        }
+
+        @media (max-width: 900px) {
+            .role-panel, .grid { grid-template-columns: 1fr; }
+            .wide, .result-card { grid-column: span 1; }
+            .form-grid, .history-summary, .medical-grid { grid-template-columns: 1fr; }
+            .hash-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="hero">
+            <p class="eyebrow">Hybrid Blockchain Demo</p>
+            <h1>Medical Record Integrity System</h1>
+            <p class="subtitle">SQLite off-chain storage + Hash verification + Patient history on blockchain</p>
+        </header>
+
+        <section class="role-panel">
+            <label class="role-field">
+                <span>Current Role</span>
+                <div class="select-wrap">
+                    <div class="role-icon">👤</div>
+                    <select id="role" onchange="updateRoleUI()">
+                        <option value="Doctor">Doctor</option>
+                        <option value="Patient">Patient</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+            </label>
+
+            <label id="patientBox" class="role-field" style="display: none;">
+                <span>Patient Identity</span>
+                <div class="patient-wrap">
+                    <div class="role-icon">🏥</div>
+                    <input id="current_patient_id" placeholder="例如 P001" value="P001" oninput="updateRoleUI(false)" />
+                </div>
+            </label>
+
+            <div class="role-badge" id="roleBadge">
+                <strong>Doctor Mode</strong>
+                <small>Can add, query, and verify medical records.</small>
+            </div>
+        </section>
+
+        <section class="toolbar">
+            <button onclick="getAllRecords()">查詢病歷</button>
+            <button class="secondary role-card" data-roles="Admin" onclick="resetDemo()">重置 Demo 資料</button>
+        </section>
+
+        <main class="grid">
+            <section class="card wide role-card" data-roles="Doctor,Admin">
+                <h2>新增病歷</h2>
+                <p class="hint">Doctor / Admin 可新增一筆醫療紀錄。若 patient_id 相同，也可以視為同一病患的新就診紀錄。</p>
+                <div class="form-grid">
+                    <input id="record_id" placeholder="Record ID，例如 R004" />
+                    <input id="patient_id" placeholder="Patient ID，例如 P004" />
+                    <input id="doctor_name" placeholder="Doctor Name，例如 Dr. Lee" />
+                    <input id="diagnosis" placeholder="Diagnosis，例如 Headache" />
+                    <input id="prescription" placeholder="Prescription，例如 Medicine D" />
+                </div>
+                <button onclick="addRecord()">新增病歷</button>
+            </section>
+
+            <section class="card wide history-card role-card" data-roles="Doctor,Admin">
+                <h2>更新病歷版本</h2>
+                <p class="hint">不是覆蓋舊資料，而是用同一個 Patient ID 新增一筆新的 Record，讓區塊鏈保留病患從過去到現在的歷史。</p>
+                <div class="form-grid">
+                    <input id="update_patient_id" placeholder="Patient ID，例如 P001" />
+                    <input id="update_record_id" placeholder="New Record ID，例如 R004" />
+                    <input id="update_doctor_name" placeholder="Doctor Name，例如 Dr. Lee" />
+                    <input id="update_diagnosis" placeholder="New Diagnosis，例如 Recovery Check" />
+                    <input id="update_prescription" placeholder="New Prescription，例如 Medicine E" />
+                </div>
+                <button onclick="updatePatientRecord()">新增此病患的新版本病歷</button>
+            </section>
+
+            <section class="card role-card" data-roles="Doctor,Patient,Admin">
+                <h2>查詢病患完整病歷</h2>
+                <p class="hint">輸入 Patient ID，查詢該病患從過去到現在的所有區塊鏈病歷紀錄。</p>
+                <input id="history_patient_id" placeholder="P001" />
+                <button onclick="getPatientHistory()">查詢 History</button>
+            </section>
+
+            <section class="card role-card" data-roles="Doctor,Patient,Admin">
+                <h2>查詢單筆病歷</h2>
+                <p class="hint">Doctor / Admin 可查任一筆；Patient 只能查自己的病歷。</p>
+                <input id="query_id" placeholder="R002" />
+                <button onclick="getOneRecord()">查詢</button>
+            </section>
+
+            <section class="card role-card" data-roles="Doctor,Patient,Admin">
+                <h2>驗證病歷</h2>
+                <p class="hint">重新計算 hash，判斷資料是否被竄改。</p>
+                <input id="verify_id" placeholder="R002" />
+                <button onclick="verifyRecord()">驗證</button>
+            </section>
+
+            <section class="card danger-card role-card" data-roles="Admin">
+                <h2>模擬竄改</h2>
+                <p class="hint">Admin demo 功能：將 diagnosis 改成 Cancer，但不更新原始 hash。</p>
+                <input id="tamper_id" placeholder="R002" />
+                <button class="danger" onclick="tamperRecord()">Tamper</button>
+            </section>
+
+            <section class="card role-card" data-roles="Admin">
+                <h2>恢復資料</h2>
+                <p class="hint">Admin 可將被竄改的病歷恢復成 blockchain 中保存的原始狀態。</p>
+                <input id="restore_id" placeholder="R002" />
+                <button onclick="restoreRecord()">Restore</button>
+            </section>
+
+            <section class="card danger-card role-card" data-roles="Admin">
+                <h2>刪除資料</h2>
+                <p class="hint">Admin 可刪除指定 record_id 的病歷資料。</p>
+                <input id="delete_id" placeholder="R002" />
+                <button class="danger" onclick="deleteRecord()">Delete</button>
+            </section>
+
+            <section class="card result-card">
+                <h2 id="resultTitle">系統結果</h2>
+                <div id="status" class="status neutral">等待操作</div>
+                <div id="visualOutput" class="visual-output"></div>
+                <pre id="output">請先選擇角色，再按上方按鈕開始測試。</pre>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const output = document.getElementById("output");
+        const visualOutput = document.getElementById("visualOutput");
+        const statusBox = document.getElementById("status");
+        const resultTitle = document.getElementById("resultTitle");
+
+        function getSelectedRole() {
+            return document.getElementById("role").value;
+        }
+
+        function getSelectedPatientId() {
+            return document.getElementById("current_patient_id").value.trim();
+        }
+
+        function authHeaders(extraHeaders = {}) {
+            return {
+                "X-Role": getSelectedRole(),
+                "X-Patient-Id": getSelectedPatientId(),
+                ...extraHeaders
+            };
+        }
+
+        function updateRoleUI(showMessage = true) {
+            const role = getSelectedRole();
+            const patientBox = document.getElementById("patientBox");
+            const roleBadge = document.getElementById("roleBadge");
+            patientBox.style.display = role === "Patient" ? "flex" : "none";
+
+            document.querySelectorAll(".role-card").forEach(card => {
+                const allowedRoles = card.dataset.roles.split(",");
+                card.style.display = allowedRoles.includes(role) ? "" : "none";
+            });
+
+            const descriptions = {
+                Doctor: ["Doctor Mode", "Can add, query, update, and verify medical records."],
+                Patient: ["Patient Mode", `Can only view and verify own records. Current Patient ID: ${getSelectedPatientId() || "Not set"}`],
+                Admin: ["Admin Mode", "Can manage tampering tests, restore, delete, and reset demo data."]
+            };
+
+            roleBadge.innerHTML = `<strong>${descriptions[role][0]}</strong><small>${descriptions[role][1]}</small>`;
+
+            if (showMessage) {
+                show({
+                    message: `Current role: ${role}`,
+                    note: descriptions[role][1]
+                });
+            }
+        }
+
+        function escapeHTML(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function shortHash(hash) {
+            if (!hash) return "-";
+            if (hash.length <= 18) return hash;
+            return `${hash.slice(0, 12)}...${hash.slice(-8)}`;
+        }
+
+        function rawJsonBlock(data) {
+            return `
+                <details class="raw-json-toggle">
+                    <summary>查看原始 JSON 資料</summary>
+                    <pre>${escapeHTML(JSON.stringify(data, null, 2))}</pre>
+                </details>
+            `;
+        }
+
+        function renderHistoryTimeline(data) {
+            const history = data.history || [];
+            resultTitle.textContent = "Patient Medical History Timeline";
+            output.style.display = "none";
+            visualOutput.style.display = "block";
+
+            if (history.length === 0) {
+                visualOutput.innerHTML = `
+                    <div class="history-summary">
+                        <div class="summary-box"><span>Patient ID</span><strong>${escapeHTML(data.patient_id)}</strong></div>
+                        <div class="summary-box"><span>Total Records</span><strong>0</strong></div>
+                        <div class="summary-box"><span>Source</span><strong>Blockchain</strong></div>
+                    </div>
+                    <div class="empty-state">目前查不到這位病患的歷史病歷。</div>
+                    ${rawJsonBlock(data)}
+                `;
+                return;
+            }
+
+            const timelineItems = history.map((item, index) => `
+                <div class="timeline-item">
+                    <div class="timeline-dot">${index + 1}</div>
+                    <article class="medical-card">
+                        <div class="medical-card-head">
+                            <div>
+                                <h3>${escapeHTML(item.record_id)} · ${escapeHTML(item.diagnosis)}</h3>
+                                <p>${escapeHTML(item.record_timestamp)}｜Doctor: ${escapeHTML(item.doctor_name)}</p>
+                            </div>
+                            <span class="pill">Block #${escapeHTML(item.block_index)}</span>
+                        </div>
+
+                        <div class="medical-grid">
+                            <div class="info-line"><span>Patient ID</span><strong>${escapeHTML(item.patient_id)}</strong></div>
+                            <div class="info-line"><span>Prescription</span><strong>${escapeHTML(item.prescription)}</strong></div>
+                            <div class="info-line"><span>Record Hash</span><strong>${escapeHTML(shortHash(item.record_hash))}</strong></div>
+                            <div class="info-line"><span>Block Time</span><strong>${escapeHTML(item.block_timestamp)}</strong></div>
+                        </div>
+
+                        <div class="chain-box">
+                            <p class="chain-title">Blockchain Link</p>
+                            <div class="hash-row"><span>Previous Hash</span><span>${escapeHTML(shortHash(item.previous_hash))}</span></div>
+                            <div class="hash-row"><span>Current Hash</span><span>${escapeHTML(shortHash(item.block_hash))}</span></div>
+                            <div class="hash-row"><span>Record Hash</span><span>${escapeHTML(shortHash(item.record_hash))}</span></div>
+                        </div>
+                    </article>
+                </div>
+            `).join("");
+
+            visualOutput.innerHTML = `
+                <div class="history-summary">
+                    <div class="summary-box"><span>Patient ID</span><strong>${escapeHTML(data.patient_id)}</strong></div>
+                    <div class="summary-box"><span>Total Records</span><strong>${history.length}</strong></div>
+                    <div class="summary-box"><span>Source</span><strong>Blockchain</strong></div>
+                </div>
+                <div class="timeline">${timelineItems}</div>
+                ${rawJsonBlock(data)}
+            `;
+        }
+
+        function renderRecordCards(data) {
+            const records = data.records || [];
+            resultTitle.textContent = "Medical Record Cards";
+            output.style.display = "none";
+            visualOutput.style.display = "block";
+
+            if (records.length === 0) {
+                visualOutput.innerHTML = `
+                    <div class="empty-state">目前沒有可顯示的病歷，或目前角色沒有可查看的資料。</div>
+                    ${rawJsonBlock(data)}
+                `;
+                return;
+            }
+
+            const cards = records.map(item => `
+                <article class="medical-card" style="margin-bottom: 14px;">
+                    <div class="medical-card-head">
+                        <div>
+                            <h3>${escapeHTML(item.record_id)} · ${escapeHTML(item.diagnosis)}</h3>
+                            <p>${escapeHTML(item.timestamp)}｜Doctor: ${escapeHTML(item.doctor_name)}</p>
+                        </div>
+                        <span class="pill">${escapeHTML(item.patient_id)}</span>
+                    </div>
+                    <div class="medical-grid">
+                        <div class="info-line"><span>Prescription</span><strong>${escapeHTML(item.prescription)}</strong></div>
+                        <div class="info-line"><span>Record Hash</span><strong>${escapeHTML(shortHash(item.hash))}</strong></div>
+                    </div>
+                </article>
+            `).join("");
+
+            visualOutput.innerHTML = cards + rawJsonBlock(data);
+        }
+
+        function show(data) {
+            if (data.history && Array.isArray(data.history)) {
+                renderHistoryTimeline(data);
+            } else if (data.records && Array.isArray(data.records)) {
+                renderRecordCards(data);
+            } else {
+                resultTitle.textContent = "系統結果";
+                visualOutput.style.display = "none";
+                output.style.display = "block";
+                output.textContent = JSON.stringify(data, null, 2);
+            }
+
+            if (data.result === "VALID") {
+                statusBox.textContent = "VALID：資料完整";
+                statusBox.className = "status valid";
+            } else if (data.result === "INVALID") {
+                statusBox.textContent = "INVALID：資料可能遭到竄改";
+                statusBox.className = "status invalid";
+            } else if (data.status === "FORBIDDEN") {
+                statusBox.textContent = "FORBIDDEN：目前角色沒有權限";
+                statusBox.className = "status invalid";
+            } else if (data.error) {
+                statusBox.textContent = "ERROR：操作失敗";
+                statusBox.className = "status invalid";
+            } else if (data.history && Array.isArray(data.history)) {
+                statusBox.textContent = "HISTORY：已載入病患時間軸";
+                statusBox.className = "status valid";
+            } else {
+                statusBox.textContent = "操作完成";
+                statusBox.className = "status neutral";
+            }
+        }
+
+        async function callApi(url, options = {}) {
+            try {
+                options.headers = authHeaders(options.headers || {});
+
+                const res = await fetch(url, options);
+                const data = await res.json();
+                show(data);
+            } catch (err) {
+                show({ error: err.message });
+            }
+        }
+
+        function getAllRecords() {
+            callApi("/records");
+        }
+
+        function getOneRecord() {
+            const id = document.getElementById("query_id").value.trim();
+            if (!id) return show({ error: "Please enter a record ID." });
+            callApi(`/records/${id}`);
+        }
+
+        function getPatientHistory() {
+            const role = getSelectedRole();
+            let id = document.getElementById("history_patient_id").value.trim();
+
+            if (!id && role === "Patient") {
+                id = getSelectedPatientId();
+            }
+
+            if (!id) return show({ error: "Please enter a patient ID." });
+            callApi(`/patients/${id}/history`);
+        }
+
+        function verifyRecord() {
+            const id = document.getElementById("verify_id").value.trim();
+            if (!id) return show({ error: "Please enter a record ID." });
+            callApi(`/verify/${id}`);
+        }
+
+        function tamperRecord() {
+            const id = document.getElementById("tamper_id").value.trim();
+            if (!id) return show({ error: "Please enter a record ID." });
+            callApi(`/tamper/${id}`);
+        }
+
+        function restoreRecord() {
+            const id = document.getElementById("restore_id").value.trim();
+            if (!id) return show({ error: "Please enter a record ID." });
+            callApi(`/restore/${id}`);
+        }
+
+        function deleteRecord() {
+            const id = document.getElementById("delete_id").value.trim();
+            if (!id) return show({ error: "Please enter a record ID." });
+
+            const confirmDelete = confirm(`確定要刪除 ${id} 這筆病歷嗎？`);
+            if (!confirmDelete) return;
+
+            callApi(`/records/${id}`, {
+                method: "DELETE"
+            });
+        }
+
+        function resetDemo() {
+            callApi("/reset");
+        }
+
+        async function addRecord() {
+            const data = {
+                record_id: document.getElementById("record_id").value.trim(),
+                patient_id: document.getElementById("patient_id").value.trim(),
+                doctor_name: document.getElementById("doctor_name").value.trim(),
+                diagnosis: document.getElementById("diagnosis").value.trim(),
+                prescription: document.getElementById("prescription").value.trim()
+            };
+
+            await callApi("/records", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+        }
+
+        async function updatePatientRecord() {
+            const patientId = document.getElementById("update_patient_id").value.trim();
+            if (!patientId) return show({ error: "Please enter a patient ID." });
+
+            const data = {
+                record_id: document.getElementById("update_record_id").value.trim(),
+                doctor_name: document.getElementById("update_doctor_name").value.trim(),
+                diagnosis: document.getElementById("update_diagnosis").value.trim(),
+                prescription: document.getElementById("update_prescription").value.trim()
+            };
+
+            await callApi(`/patients/${patientId}/update`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+        }
+
+        updateRoleUI();
+    </script>
+</body>
+</html>

@@ -1,70 +1,169 @@
-# 從 flask 套件引入：
-# Flask → 建立伺服器
-# request → 取得使用者傳來的資料（例如 POST JSON）
-# jsonify → 回傳 JSON 格式資料
-from flask import Flask, request, jsonify
-
-# 從你自己寫的 blockchain.py 匯入所有功能
+from flask import Flask, request, jsonify, render_template
 from blockchain import *
 
-# 建立 Flask 應用（server）
 app = Flask(__name__)
+
+# =========================
+# Step 7：Role-based Access Control
+# =========================
+ROLES = ["Doctor", "Patient", "Admin"]
+
+
+def get_current_role():
+    """從 request header 讀取目前使用者角色。"""
+    return request.headers.get("X-Role", "Guest")
+
+
+def get_current_patient_id():
+    """Patient 角色用來判斷只能查看自己的病歷。"""
+    return request.headers.get("X-Patient-Id", "").strip()
+
+
+def forbidden(message="Permission denied"):
+    return jsonify({
+        "status": "FORBIDDEN",
+        "error": message,
+        "role": get_current_role()
+    }), 403
+
+
+def require_role(allowed_roles):
+    """檢查目前角色是否有權限使用某個 API。"""
+    role = get_current_role()
+
+    if role not in allowed_roles:
+        return forbidden(
+            f"This action is only allowed for: {', '.join(allowed_roles)}"
+        )
+
+    return None
+
+
+def can_patient_access_record(row):
+    """
+    row 格式：
+    record_id, patient_id, doctor_name, diagnosis, prescription, timestamp, record_hash
+    Patient 只能存取自己的 patient_id。
+    Doctor / Admin 不受此限制。
+    """
+    role = get_current_role()
+
+    if role in ["Doctor", "Admin"]:
+        return True
+
+    if role == "Patient":
+        patient_id = get_current_patient_id()
+        return patient_id != "" and row[1] == patient_id
+
+    return False
+
+
+def get_patient_history_from_blockchain(patient_id):
+    """
+    從目前記憶體中的 blockchain 查詢某位病患的所有歷史病歷。
+    重點：不修改舊紀錄，而是依照區塊順序列出同一 patient_id 的所有 record。
+    """
+    history = []
+
+    for block in blockchain.chain:
+        if not isinstance(block.medical_record, MedicalRecord):
+            continue
+
+        record = block.medical_record
+        if record.patient_id != patient_id:
+            continue
+
+        history.append({
+            "block_index": block.index,
+            "block_timestamp": block.timestamp,
+            "previous_hash": block.previous_hash,
+            "block_hash": block.hash,
+            "record_id": record.record_id,
+            "patient_id": record.patient_id,
+            "doctor_name": record.doctor_name,
+            "diagnosis": record.diagnosis,
+            "prescription": record.prescription,
+            "record_timestamp": record.timestamp,
+            "record_hash": record.calculate_hash()
+        })
+
+    return history
 
 
 # =========================
 # 初始化 API 系統
 # =========================
-
-# 建立資料庫（如果不存在）
 init_db()
-
-# 清空資料庫（讓 demo 每次都是乾淨狀態）
-reset_database()
-
-# 建立區塊鏈物件（存在記憶體中）
 blockchain = Blockchain()
 
 
 def initialize_demo_data():
-    """
-    建立三筆測試用的醫療資料
-    """
-
-    # 建立 MedicalRecord 物件（類似 struct / class instance）
+    """建立 demo 用的初始病歷資料。"""
     record1 = MedicalRecord("R001", "P001", "Dr. Wang", "Flu", "Medicine A")
     record2 = MedicalRecord("R002", "P002", "Dr. Lin", "Cold", "Medicine B")
     record3 = MedicalRecord("R003", "P003", "Dr. Chen", "Fever", "Medicine C")
 
-    # Python 語法：for loop + list
-    # 依序處理每一筆資料
     for record in [record1, record2, record3]:
-        insert_record(record)        # 存進 SQLite（DB）
-        blockchain.add_block(record) # 存進區塊鏈
+        insert_record(record)
+        blockchain.add_block(record)
 
 
-# 呼叫函式（程式啟動時就會執行）
-initialize_demo_data()
+def load_blockchain_from_db():
+    """
+    從 SQLite 讀取目前已有的病歷資料，
+    並重新建立記憶體中的 blockchain。
+    """
+    records = get_all_records()
+
+    for r in records:
+        record = MedicalRecord(
+            record_id=r[0],
+            patient_id=r[1],
+            doctor_name=r[2],
+            diagnosis=r[3],
+            prescription=r[4],
+            timestamp=r[5]
+        )
+
+        blockchain.add_block(record)
+
+
+existing_records = get_all_records()
+
+if len(existing_records) == 0:
+    print("[INIT] Database is empty. Creating demo data...")
+    initialize_demo_data()
+else:
+    print("[INIT] Existing records found. Loading blockchain from database...")
+    load_blockchain_from_db()
+
+
+# =========================
+# 前端首頁 UI
+# =========================
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
 
 
 # =========================
 # API 1：查詢全部病歷
+# Doctor / Admin 可以看全部
+# Patient 只能看自己的 patient_id
 # =========================
-
-# @app.route = Flask 的「路由」
-# 當有人用 GET 請求 /records，就會執行這個函式
 @app.route("/records", methods=["GET"])
 def get_records():
+    permission_error = require_role(["Doctor", "Patient", "Admin"])
+    if permission_error:
+        return permission_error
 
-    # 從 DB 拿所有資料（回傳 list）
     records = get_all_records()
 
     result = []
-
-    # r 是 tuple，例如：
-    # ("R001", "P001", "Dr. Wang", ...)
     for r in records:
+        if not can_patient_access_record(r):
+            continue
 
-        # 把 tuple 轉成 dictionary（JSON 格式）
         result.append({
             "record_id": r[0],
             "patient_id": r[1],
@@ -75,27 +174,32 @@ def get_records():
             "hash": r[6]
         })
 
-    # jsonify 會自動轉成 JSON 回傳給前端
-    return jsonify(result)
+    return jsonify({
+        "role": get_current_role(),
+        "patient_id": get_current_patient_id() if get_current_role() == "Patient" else None,
+        "records": result
+    })
 
 
 # =========================
 # API 2：查詢單筆病歷
+# Doctor / Admin 可以查任一筆
+# Patient 只能查自己的病歷
 # =========================
-
-# <record_id> 是「路徑參數」
-# 例如 /records/R002 → record_id = "R002"
 @app.route("/records/<record_id>", methods=["GET"])
 def get_record(record_id):
+    permission_error = require_role(["Doctor", "Patient", "Admin"])
+    if permission_error:
+        return permission_error
 
-    # 從 DB 找指定 record
     r = get_record_by_id(record_id)
 
-    # 如果找不到 → 回傳錯誤
     if not r:
         return jsonify({"error": "Record not found"}), 404
 
-    # 回傳該筆資料
+    if not can_patient_access_record(r):
+        return forbidden("Patients can only view their own medical records.")
+
     return jsonify({
         "record_id": r[0],
         "patient_id": r[1],
@@ -109,21 +213,24 @@ def get_record(record_id):
 
 # =========================
 # API 3：新增病歷
+# Doctor / Admin 才能新增
 # =========================
-
-# POST 通常用來「新增資料」
 @app.route("/records", methods=["POST"])
 def add_record():
+    permission_error = require_role(["Doctor", "Admin"])
+    if permission_error:
+        return permission_error
 
-    # request.json → 取得使用者傳來的 JSON
-    # 例如：
-    # {
-    #   "record_id": "R004",
-    #   ...
-    # }
     data = request.json
 
-    # 建立 MedicalRecord 物件
+    required_fields = ["record_id", "patient_id", "doctor_name", "diagnosis", "prescription"]
+    for field in required_fields:
+        if field not in data or data[field] == "":
+            return jsonify({"error": f"Missing field: {field}"}), 400
+
+    if get_record_by_id(data["record_id"]):
+        return jsonify({"error": "Record already exists"}), 409
+
     record = MedicalRecord(
         data["record_id"],
         data["patient_id"],
@@ -132,32 +239,37 @@ def add_record():
         data["prescription"]
     )
 
-    # 存進 DB
     insert_record(record)
-
-    # 加進區塊鏈
     blockchain.add_block(record)
 
-    # 回傳成功訊息
     return jsonify({
         "message": "Record added successfully",
-        "record_id": record.record_id
+        "role": get_current_role(),
+        "record_id": record.record_id,
+        "hash": record.calculate_hash()
     })
 
 
 # =========================
 # API 4：驗證病歷完整性
+# Doctor / Admin 可以驗證任一筆
+# Patient 只能驗證自己的病歷
 # =========================
-
 @app.route("/verify/<record_id>", methods=["GET"])
 def verify(record_id):
+    permission_error = require_role(["Doctor", "Patient", "Admin"])
+    if permission_error:
+        return permission_error
 
-    # 呼叫你在 blockchain.py 寫的驗證函式
+    r = get_record_by_id(record_id)
+    if not r:
+        return jsonify({"error": "Record not found"}), 404
+
+    if not can_patient_access_record(r):
+        return forbidden("Patients can only verify their own medical records.")
+
     result = verify_record_from_db(record_id, blockchain)
 
-    # 三元運算子（Python 簡寫 if-else）
-    # True → VALID
-    # False → INVALID
     return jsonify({
         "record_id": record_id,
         "result": "VALID" if result else "INVALID"
@@ -165,30 +277,172 @@ def verify(record_id):
 
 
 # =========================
-# API 5：模擬竄改資料
+# API 5：查詢某位病患的完整歷史病歷
+# Doctor / Admin 可以查任一病患
+# Patient 只能查自己的歷史紀錄
 # =========================
+@app.route("/patients/<patient_id>/history", methods=["GET"])
+def get_patient_history(patient_id):
+    permission_error = require_role(["Doctor", "Patient", "Admin"])
+    if permission_error:
+        return permission_error
 
+    if get_current_role() == "Patient" and get_current_patient_id() != patient_id:
+        return forbidden("Patients can only view their own medical history.")
+
+    history = get_patient_history_from_blockchain(patient_id)
+
+    return jsonify({
+        "patient_id": patient_id,
+        "role": get_current_role(),
+        "count": len(history),
+        "history": history,
+        "note": "History is read from blockchain blocks. Old records are preserved instead of being overwritten."
+    })
+
+
+# =========================
+# API 6：更新病患病歷，也就是新增同一 patient_id 的新版本紀錄
+# Doctor / Admin 才能新增歷史版本
+# =========================
+@app.route("/patients/<patient_id>/update", methods=["POST"])
+def update_patient_record(patient_id):
+    permission_error = require_role(["Doctor", "Admin"])
+    if permission_error:
+        return permission_error
+
+    data = request.json or {}
+    required_fields = ["record_id", "doctor_name", "diagnosis", "prescription"]
+
+    for field in required_fields:
+        if field not in data or data[field] == "":
+            return jsonify({"error": f"Missing field: {field}"}), 400
+
+    if get_record_by_id(data["record_id"]):
+        return jsonify({"error": "Record already exists"}), 409
+
+    record = MedicalRecord(
+        data["record_id"],
+        patient_id,
+        data["doctor_name"],
+        data["diagnosis"],
+        data["prescription"]
+    )
+
+    insert_record(record)
+    blockchain.add_block(record)
+
+    return jsonify({
+        "message": "Patient medical history updated successfully",
+        "explanation": "A new record was added for the same patient_id. The old record was not overwritten.",
+        "role": get_current_role(),
+        "record_id": record.record_id,
+        "patient_id": record.patient_id,
+        "hash": record.calculate_hash()
+    })
+
+
+# =========================
+# API 7：模擬竄改資料
+# Demo 中設為 Admin 權限，避免一般使用者可竄改資料
+# =========================
 @app.route("/tamper/<record_id>", methods=["GET"])
 def tamper(record_id):
+    permission_error = require_role(["Admin"])
+    if permission_error:
+        return permission_error
 
-    # 把 diagnosis 改成 Cancer（模擬駭客）
+    if not get_record_by_id(record_id):
+        return jsonify({"error": "Record not found"}), 404
+
     tamper_database_record(record_id, "Cancer")
 
     return jsonify({
         "message": "Database record has been tampered",
+        "role": get_current_role(),
         "record_id": record_id,
         "new_diagnosis": "Cancer"
     })
 
 
 # =========================
-# 啟動 Flask Server
+# API 8：恢復被竄改的資料
+# Admin 才能恢復資料
 # =========================
+@app.route("/restore/<record_id>", methods=["GET"])
+def restore(record_id):
+    permission_error = require_role(["Admin"])
+    if permission_error:
+        return permission_error
 
-# 只有「直接執行這個檔案」才會跑這段
+    if not get_record_by_id(record_id):
+        return jsonify({
+            "error": "Record not found in database",
+            "record_id": record_id
+        }), 404
+
+    result = restore_record_from_blockchain(record_id, blockchain)
+
+    if result:
+        return jsonify({
+            "message": "Record restored successfully",
+            "role": get_current_role(),
+            "record_id": record_id
+        })
+    else:
+        return jsonify({
+            "error": "Record could not be restored",
+            "record_id": record_id
+        }), 400
+
+
+# =========================
+# API 9：刪除指定病歷
+# Admin 才能刪除資料
+# =========================
+@app.route("/records/<record_id>", methods=["DELETE"])
+def delete_record(record_id):
+    permission_error = require_role(["Admin"])
+    if permission_error:
+        return permission_error
+
+    result = delete_record_from_db(record_id)
+
+    if result:
+        return jsonify({
+            "message": "Record deleted successfully",
+            "role": get_current_role(),
+            "record_id": record_id
+        })
+    else:
+        return jsonify({
+            "error": "Record not found",
+            "record_id": record_id
+        }), 404
+
+
+# =========================
+# API 10：重置 demo 資料
+# Admin 才能重置 demo
+# =========================
+@app.route("/reset", methods=["GET"])
+def reset_demo():
+    permission_error = require_role(["Admin"])
+    if permission_error:
+        return permission_error
+
+    global blockchain
+
+    reset_database()
+    blockchain = Blockchain()
+    initialize_demo_data()
+
+    return jsonify({
+        "message": "Demo data reset successfully",
+        "role": get_current_role(),
+        "records": ["R001", "R002", "R003"]
+    })
+
+
 if __name__ == "__main__":
-
-    # debug=True：
-    # - 自動重啟
-    # - 顯示錯誤訊息
     app.run(debug=True)

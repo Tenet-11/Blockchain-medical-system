@@ -43,7 +43,7 @@ def init_db():
     conn.close()
 
 
-# 2️⃣ 插入資料
+# 把一筆 MedicalRecord 物件存進 SQLite
 def insert_record(record):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -72,7 +72,7 @@ def insert_record(record):
     conn.close()
 
 
-# 3️⃣ 查全部資料
+# 從 SQLite 讀取所有病歷
 def get_all_records():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -88,7 +88,7 @@ def get_all_records():
     return rows
 
 
-# 4️⃣ 查單筆資料
+# 根據 record_id 查詢指定病歷
 def get_record_by_id(record_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -105,7 +105,7 @@ def get_record_by_id(record_id):
     return row
 
 
-# 5️⃣ 顯示資料庫內容（方便你截圖）
+# 顯示出好看的格式
 def display_database():
     records = get_all_records()
 
@@ -358,6 +358,81 @@ def tamper_database_record(record_id, new_diagnosis):
 
     print(f"[DB] Record {record_id} diagnosis changed to {new_diagnosis}.")
 
+def delete_record_from_db(record_id):
+    """
+    從 SQLite 刪除指定 record_id 的病歷資料。
+    """
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    DELETE FROM medical_records
+    WHERE record_id = ?
+    """, (record_id,))
+
+    deleted_count = cursor.rowcount
+
+    conn.commit()
+    conn.close()
+
+    if deleted_count > 0:
+        print(f"[DB] Record {record_id} deleted.")
+        return True
+    else:
+        print(f"[DB] Record {record_id} not found.")
+        return False
+    
+def restore_record_from_blockchain(record_id, blockchain):
+    """
+    根據 blockchain 中保存的原始資料，
+    將 SQLite 中被竄改的病歷恢復成原本狀態。
+    """
+
+    block = blockchain.find_block_by_record_id(record_id)
+
+    if not block:
+        print(f"[RESTORE] Record {record_id} not found in blockchain.")
+        return False
+
+    original_record = block.medical_record
+
+    if not isinstance(original_record, MedicalRecord):
+        print("[RESTORE] Invalid medical record in blockchain.")
+        return False
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    UPDATE medical_records
+    SET patient_id = ?,
+        doctor_name = ?,
+        diagnosis = ?,
+        prescription = ?,
+        timestamp = ?,
+        record_hash = ?
+    WHERE record_id = ?
+    """, (
+        original_record.patient_id,
+        original_record.doctor_name,
+        original_record.diagnosis,
+        original_record.prescription,
+        original_record.timestamp,
+        original_record.calculate_hash(),
+        original_record.record_id
+    ))
+
+    updated_count = cursor.rowcount
+
+    conn.commit()
+    conn.close()
+
+    if updated_count > 0:
+        print(f"[RESTORE] Record {record_id} restored from blockchain.")
+        return True
+    else:
+        print(f"[RESTORE] Record {record_id} not found in database.")
+        return False
 
 # =========================
 # Main Program (Demo for Step 4)
