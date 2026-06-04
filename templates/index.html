@@ -547,7 +547,8 @@
                 <h2>驗證病歷</h2>
                 <p class="hint">重新計算 hash，判斷資料是否被竄改。</p>
                 <input id="verify_id" placeholder="R002" />
-                <button onclick="verifyRecord()">驗證</button>
+                <button onclick="verifyRecord()">SQLite 驗證</button>
+                <button class="secondary" onclick="verifyOnChain()">鏈上驗證</button>
             </section>
 
             <section class="card danger-card role-card" data-roles="Admin">
@@ -757,10 +758,10 @@
                 output.textContent = JSON.stringify(data, null, 2);
             }
 
-            if (data.result === "VALID") {
+            if (data.status === "VALID" || data.result === "VALID") {
                 statusBox.textContent = "VALID：資料完整";
                 statusBox.className = "status valid";
-            } else if (data.result === "INVALID") {
+            } else if (data.status === "INVALID" || data.result === "INVALID") {
                 statusBox.textContent = "INVALID：資料可能遭到竄改";
                 statusBox.className = "status invalid";
             } else if (data.status === "FORBIDDEN") {
@@ -816,6 +817,12 @@
             const id = document.getElementById("verify_id").value.trim();
             if (!id) return show({ error: "Please enter a record ID." });
             callApi(`/verify/${id}`);
+        }
+
+        function verifyOnChain() {
+            const id = document.getElementById("verify_id").value.trim();
+            if (!id) return show({ error: "Please enter a record ID." });
+            callApi(`/verify_on_chain/${id}`);
         }
 
         function tamperRecord() {
