@@ -454,11 +454,111 @@
             font-weight: 800;
         }
 
+        .action-result-card {
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 20px;
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            box-shadow: 0 10px 24px rgba(39, 74, 132, 0.08);
+        }
+
+        .action-result-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .action-result-head h3 {
+            margin: 0 0 6px;
+            font-size: 22px;
+        }
+
+        .action-result-head p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .result-pill {
+            display: inline-block;
+            padding: 9px 13px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .result-pill.valid {
+            color: var(--success);
+            background: var(--success-soft);
+        }
+
+        .result-pill.invalid {
+            color: var(--danger);
+            background: var(--danger-soft);
+        }
+
+        .result-pill.neutral {
+            color: var(--primary-dark);
+            background: var(--soft-primary);
+        }
+
+        .result-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .result-detail {
+            padding: 14px;
+            border-radius: 16px;
+            background: #ffffff;
+            border: 1px solid var(--border);
+        }
+
+        .result-detail span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
+
+        .result-detail strong {
+            display: block;
+            font-size: 15px;
+            overflow-wrap: anywhere;
+        }
+
+        .warning-box {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: var(--danger-soft);
+            color: var(--danger);
+            font-weight: 800;
+        }
+
+        .success-box {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: var(--success-soft);
+            color: var(--success);
+            font-weight: 800;
+        }
+
         @media (max-width: 900px) {
             .role-panel, .grid { grid-template-columns: 1fr; }
             .wide, .result-card { grid-column: span 1; }
             .form-grid, .history-summary, .medical-grid { grid-template-columns: 1fr; }
             .hash-row { grid-template-columns: 1fr; }
+            .result-detail-grid { grid-template-columns: 1fr; }
+            .action-result-head { flex-direction: column; }
         }
     </style>
 </head>
@@ -746,11 +846,154 @@
             visualOutput.innerHTML = cards + rawJsonBlock(data);
         }
 
+        function renderActionResult(data, type = "general") {
+            resultTitle.textContent = "操作結果";
+            output.style.display = "none";
+            visualOutput.style.display = "block";
+
+            let title = "操作完成";
+            let description = data.message || "系統已完成此操作。";
+            let pillText = "完成";
+            let pillClass = "neutral";
+            let box = "";
+
+            if (type === "sqliteVerify") {
+                title = "SQLite 資料完整性驗證";
+                description = "重新計算目前 SQLite 病歷資料的 hash，並與資料庫原本保存的 hash 比對。";
+                pillText = data.result === "VALID" ? "VALID" : "INVALID";
+                pillClass = data.result === "VALID" ? "valid" : "invalid";
+                box = data.result === "VALID"
+                    ? `<div class="success-box">SQLite 驗證通過：資料內容與原始 hash 一致。</div>`
+                    : `<div class="warning-box">SQLite 驗證失敗：資料可能已被竄改。</div>`;
+            }
+
+            if (type === "chainVerify") {
+                title = "鏈上 Hash 驗證";
+                description = "重新計算目前 SQLite 病歷 hash，並與 Solidity 合約中保存的鏈上 hash 比對。";
+                pillText = data.result === "VALID" ? "VALID" : "INVALID";
+                pillClass = data.result === "VALID" ? "valid" : "invalid";
+                box = data.result === "VALID"
+                    ? `<div class="success-box">鏈上驗證通過：目前資料與 blockchain 保存的 hash 一致。</div>`
+                    : `<div class="warning-box">鏈上驗證失敗：目前資料與 blockchain 保存的 hash 不一致。</div>`;
+            }
+
+            if (type === "tamper") {
+                title = "模擬竄改完成";
+                description = "系統已修改 SQLite 中的病歷內容，但沒有同步更新原始 hash。";
+                pillText = "TAMPERED";
+                pillClass = "invalid";
+                box = `<div class="warning-box">接下來請執行 SQLite 驗證與鏈上驗證，應該會看到 INVALID。</div>`;
+            }
+
+            if (type === "restore") {
+                title = "資料恢復完成";
+                description = "系統已根據 blockchain 中保存的原始資料，將 SQLite 病歷恢復。";
+                pillText = "RESTORED";
+                pillClass = "valid";
+                box = `<div class="success-box">接下來請再次執行 SQLite 驗證與鏈上驗證，應該會回到 VALID。</div>`;
+            }
+
+            if (type === "delete") {
+                title = "資料刪除完成";
+                description = "系統已從 SQLite 刪除這筆病歷資料。";
+                pillText = "DELETED";
+                pillClass = "invalid";
+                box = `<div class="warning-box">注意：此操作刪除的是 SQLite 鏈下資料，鏈上的 hash 紀錄仍可作為歷史證據。</div>`;
+            }
+
+            if (type === "add") {
+                title = "新增病歷完成";
+                description = "系統已將完整病歷存入 SQLite，並把病歷 hash 寫入 blockchain。";
+                pillText = "ADDED";
+                pillClass = "valid";
+                box = `<div class="success-box">這筆病歷已建立，接下來可以進行 SQLite 驗證與鏈上驗證。</div>`;
+            }
+
+            if (type === "update") {
+                title = "病歷版本更新完成";
+                description = "系統沒有覆蓋舊病歷，而是替同一位病患新增一筆新的 Record。";
+                pillText = "NEW VERSION";
+                pillClass = "valid";
+                box = `<div class="success-box">可以查詢此 Patient ID 的 History，確認舊版本與新版本都被保留下來。</div>`;
+            }
+
+            if (type === "reset") {
+                title = "Demo 資料重置完成";
+                description = data.message || "SQLite 與 Python blockchain 已重新建立 demo 資料。";
+                pillText = "RESET";
+                pillClass = "neutral";
+                box = `<div class="warning-box">提醒：若 Ganache / Solidity 合約沒有重新部署，鏈上的舊 record_id hash 可能仍保留。Demo 建議使用全新的 Record ID。</div>`;
+            }
+
+            const details = `
+                <div class="result-detail-grid">
+                    ${data.record_id ? `<div class="result-detail"><span>Record ID</span><strong>${escapeHTML(data.record_id)}</strong></div>` : ""}
+                    ${data.patient_id ? `<div class="result-detail"><span>Patient ID</span><strong>${escapeHTML(data.patient_id)}</strong></div>` : ""}
+                    ${data.role ? `<div class="result-detail"><span>Role</span><strong>${escapeHTML(data.role)}</strong></div>` : ""}
+                    ${data.new_diagnosis ? `<div class="result-detail"><span>New Diagnosis</span><strong>${escapeHTML(data.new_diagnosis)}</strong></div>` : ""}
+                    ${data.current_hash ? `<div class="result-detail"><span>Current Hash</span><strong>${escapeHTML(shortHash(data.current_hash))}</strong></div>` : ""}
+                    ${data.on_chain_hash ? `<div class="result-detail"><span>On-chain Hash</span><strong>${escapeHTML(shortHash(data.on_chain_hash))}</strong></div>` : ""}
+                    ${data.chain_timestamp ? `<div class="result-detail"><span>Chain Timestamp</span><strong>${escapeHTML(data.chain_timestamp)}</strong></div>` : ""}
+                    ${data.hash ? `<div class="result-detail"><span>Record Hash</span><strong>${escapeHTML(shortHash(data.hash))}</strong></div>` : ""}
+                    ${data.chain_result?.status ? `<div class="result-detail"><span>Chain Status</span><strong>${escapeHTML(data.chain_result.status)}</strong></div>` : ""}
+                    ${data.chain_result?.tx_hash ? `<div class="result-detail"><span>Tx Hash</span><strong>${escapeHTML(shortHash(data.chain_result.tx_hash))}</strong></div>` : ""}
+                    ${data.chain_result?.block_number ? `<div class="result-detail"><span>Block Number</span><strong>${escapeHTML(data.chain_result.block_number)}</strong></div>` : ""}
+                </div>
+            `;
+
+            visualOutput.innerHTML = `
+                <article class="action-result-card">
+                    <div class="action-result-head">
+                        <div>
+                            <h3>${escapeHTML(title)}</h3>
+                            <p>${escapeHTML(description)}</p>
+                        </div>
+                        <span class="result-pill ${pillClass}">${escapeHTML(pillText)}</span>
+                    </div>
+
+                    ${details}
+                    ${box}
+                    ${rawJsonBlock(data)}
+                </article>
+            `;
+        }
+
         function show(data) {
             if (data.history && Array.isArray(data.history)) {
                 renderHistoryTimeline(data);
+
             } else if (data.records && Array.isArray(data.records)) {
                 renderRecordCards(data);
+
+            } else if (data.record_id && data.patient_id && data.hash && !data.message) {
+                renderRecordCards({
+                    records: [data]
+                });
+
+            } else if (data.record_id && data.result && !data.on_chain_hash) {
+                renderActionResult(data, "sqliteVerify");
+
+            } else if (data.record_id && data.on_chain_hash) {
+                renderActionResult(data, "chainVerify");
+
+            } else if (data.message === "Database record has been tampered") {
+                renderActionResult(data, "tamper");
+
+            } else if (data.message === "Record restored successfully") {
+                renderActionResult(data, "restore");
+
+            } else if (data.message === "Record deleted successfully") {
+                renderActionResult(data, "delete");
+
+            } else if (data.message === "Record added successfully and hash was sent to blockchain.") {
+                renderActionResult(data, "add");
+
+            } else if (data.message === "Patient medical history updated successfully and hash was sent to blockchain.") {
+                renderActionResult(data, "update");
+
+            } else if (data.message && data.message.toLowerCase().includes("reset")) {
+                renderActionResult(data, "reset");
+
             } else {
                 resultTitle.textContent = "系統結果";
                 visualOutput.style.display = "none";
@@ -773,6 +1016,18 @@
             } else if (data.history && Array.isArray(data.history)) {
                 statusBox.textContent = "HISTORY：已載入病患時間軸";
                 statusBox.className = "status valid";
+            } else if (data.message === "Database record has been tampered") {
+                statusBox.textContent = "TAMPER：資料已被模擬竄改";
+                statusBox.className = "status invalid";
+            } else if (data.message === "Record restored successfully") {
+                statusBox.textContent = "RESTORE：資料已恢復";
+                statusBox.className = "status valid";
+            } else if (data.message === "Record deleted successfully") {
+                statusBox.textContent = "DELETE：資料已刪除";
+                statusBox.className = "status invalid";
+            } else if (data.status === "SUCCESS") {
+                statusBox.textContent = "SUCCESS：操作成功";
+                statusBox.className = "status valid";
             } else {
                 statusBox.textContent = "操作完成";
                 statusBox.className = "status neutral";
@@ -786,8 +1041,11 @@
                 const res = await fetch(url, options);
                 const data = await res.json();
                 show(data);
+                return data;
             } catch (err) {
-                show({ error: err.message });
+                const errorData = { error: err.message };
+                show(errorData);
+                return errorData;
             }
         }
 
@@ -828,12 +1086,30 @@
         function tamperRecord() {
             const id = document.getElementById("tamper_id").value.trim();
             if (!id) return show({ error: "Please enter a record ID." });
+
+            const confirmTamper = confirm(
+                `確定要模擬竄改 ${id} 這筆病歷嗎？
+
+此操作會把 SQLite 中的 diagnosis 改成 Cancer，但不會更新原始 hash。`
+            );
+
+            if (!confirmTamper) return;
+
             callApi(`/tamper/${id}`);
         }
 
         function restoreRecord() {
             const id = document.getElementById("restore_id").value.trim();
             if (!id) return show({ error: "Please enter a record ID." });
+
+            const confirmRestore = confirm(
+                `確定要恢復 ${id} 這筆病歷嗎？
+
+系統會嘗試從 blockchain 保存的原始資料恢復 SQLite 中的病歷。`
+            );
+
+            if (!confirmRestore) return;
+
             callApi(`/restore/${id}`);
         }
 
@@ -841,7 +1117,11 @@
             const id = document.getElementById("delete_id").value.trim();
             if (!id) return show({ error: "Please enter a record ID." });
 
-            const confirmDelete = confirm(`確定要刪除 ${id} 這筆病歷嗎？`);
+            const confirmDelete = confirm(
+                `確定要刪除 ${id} 這筆病歷嗎？
+
+此操作會刪除 SQLite 中的病歷資料，但 blockchain 上的 hash 紀錄仍會保留。`
+            );
             if (!confirmDelete) return;
 
             callApi(`/records/${id}`, {
@@ -880,11 +1160,16 @@
                 prescription: document.getElementById("update_prescription").value.trim()
             };
 
-            await callApi(`/patients/${patientId}/update`, {
+            const result = await callApi(`/patients/${patientId}/update`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data)
             });
+
+            if (result.status === "SUCCESS") {
+                document.getElementById("history_patient_id").value = patientId;
+                setTimeout(() => callApi(`/patients/${patientId}/history`), 700);
+            }
         }
 
         updateRoleUI();
